@@ -37,13 +37,19 @@ echo "Docker installed successfully."
 echo "Installing Docker Compose..."
 
 # Download the latest version of Docker Compose
-sudo curl -sSL https://github.com/docker/compose/releases/download/2.18.1/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
-sudo curl -L "https://github.com/docker/compose/releases/download/2.18.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+DOCKERCOMPOSECURRENTRELEASENUMBER="$(curl -4 -k --http2 https://github.com/docker/compose/releases | grep -m1 '<a href="/docker/compose/releases/download/' | awk -F/ '{print $6}')"
 
+if [[ ! -f /usr/local/bin/docker-compose ]]; then
+
+    curl -L "https://github.com/docker/compose/releases/download/"$DOCKERCOMPOSECURRENTRELEASENUMBER"/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+    chmod +x /usr/local/bin/docker-compose
+
+    docker-compose --version
+
+    echo "Docker Compose installed successfully."
+fi
 # Make it executable
-chmod +x /usr/local/bin/docker-compose
-
-echo "Docker Compose installed successfully."
 
 # Display Docker and Docker Compose versions
 docker --version
