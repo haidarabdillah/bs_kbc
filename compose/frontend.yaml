@@ -13,7 +13,7 @@ services:
       - ../config/assets:/app/assets
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.explorer.rule=Host(`*`)"
+      - "traefik.http.routers.explorer.rule=Host(`haidar.fun`)"
       - "traefik.http.routers.explorer.entrypoints=websecure"
       - "traefik.http.routers.explorer.tls=true"
       - "traefik.http.routers.explorer.tls.certresolver=myresolver"
