@@ -1,0 +1,26 @@
+version: '3.6'
+
+services:
+  explorer:
+    image: ghcr.io/blockscout/frontend:${FRONTEND_DOCKER_TAG:-latest}
+    pull_policy: always
+    restart: always
+    depends_on:
+      - backend
+    env_file:
+      - ../config/explorer.env
+    volumes:
+      - ../config/assets:/app/assets
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.explorer.rule=Host(`*`)"
+      - "traefik.http.routers.explorer.entrypoints=websecure"
+      - "traefik.http.routers.explorer.tls=true"
+      - "traefik.http.routers.explorer.tls.certresolver=myresolver"
+      - "traefik.http.services.explorer.loadbalancer.server.port=3000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    ports:
+      - "3000:3000"

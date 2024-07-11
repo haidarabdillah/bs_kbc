@@ -1,0 +1,142 @@
+version: '3.6'
+
+services:
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+
+  db:
+    image: postgres:14
+    restart: always
+    command: postgres -c 'max_connections=200'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    env_file:
+      - ../config/blockscout/postgres.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blockscout -d blockscout"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+
+  backend:
+    image: blockscout/blockscout:latest
+    restart: always
+    depends_on:
+      - db
+      - redis
+    stop_grace_period: 5m
+    command: sh -c "bin/blockscout eval \"Elixir.Explorer.ReleaseTasks.create_and_migrate()\" && bin/blockscout start"
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file:
+      -  ../config/blockscout/blockscout.env
+    links:
+      - db:database
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.haidar.fun`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=4000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    ports:
+      - "4000:4000"
+
+  visualizer:
+    image: ghcr.io/blockscout/visualizer:latest
+    restart: always
+    env_file:
+      -  ../config/visualizer.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.visualizer.rule=Host(`visualizer.haidar.fun`)"
+      - "traefik.http.routers.visualizer.entrypoints=websecure"
+      - "traefik.http.routers.visualizer.tls=true"
+      - "traefik.http.routers.visualizer.tls.certresolver=myresolver"
+      - "traefik.http.middlewares.visualizer-cors.headers.accessControlAllowOriginList=*"
+      - "traefik.http.middlewares.visualizer-cors.headers.accessControlAllowMethods=PUT, GET, POST, OPTIONS, DELETE, PATCH"
+      - "traefik.http.middlewares.visualizer-cors.headers.accessControlAllowCredentials=true"
+      - "traefik.http.middlewares.visualizer-cors.headers.accessControlAllowHeaders=DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-csrf-token"
+      - "traefik.http.routers.visualizer.middlewares=visualizer-cors"
+      - "traefik.http.services.visualizer.loadbalancer.server.port=8050"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+
+  sig-provider:
+    image: ghcr.io/blockscout/sig-provider:latest
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+
+  stats-db:
+    image: postgres:14
+    restart: always
+    depends_on:
+      - backend
+    command: postgres -c 'max_connections=200'
+    volumes:
+      - stats_db_data:/var/lib/postgresql/data
+    env_file:
+      - ../config/stats/postgres.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stats -d stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+
+  stats:
+    image: ghcr.io/blockscout/stats:latest
+    restart: always
+    depends_on:
+      - "stats-db"
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file:
+      -  ../config/stats/stats.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stats.rule=Host(`stats.haidar.fun`)"
+      - "traefik.http.routers.stats.entrypoints=websecure"
+      - "traefik.http.routers.stats.tls=true"
+      - "traefik.http.routers.stats.tls.certresolver=myresolver"
+      - "traefik.http.services.stats.loadbalancer.server.port=8050"
+      - "traefik.http.middlewares.stats-cors.headers.accessControlAllowOriginList=*"
+      - "traefik.http.middlewares.stats-cors.headers.accessControlAllowMethods=PUT, GET, POST, OPTIONS, DELETE, PATCH"
+      - "traefik.http.middlewares.stats-cors.headers.accessControlAllowCredentials=true"
+      - "traefik.http.routers.stats.middlewares=stats-cors"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+
+volumes:
+  swapdb_data:
+  node_data:
+  redis_data:
+  db_data:
+  stats_db_data:
